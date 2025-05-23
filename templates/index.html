@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <title>Početna strana</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">Školski Kiosk</a>
+        <div class="collapse navbar-collapse justify-content-end">
+            <ul class="navbar-nav">
+                {% if session['uloga'] == 'admin' %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('admin') }}">Admin Panel</a>
+                </li>
+                {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('logout') }}">Odjava</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h2 class="mb-4">Dobrodošli, {{ session['ime'] }}!</h2>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <a href="{{ url_for('proizvodi') }}" class="btn btn-primary w-100 p-3">📦 Proizvodi</a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('porudzbina') }}" class="btn btn-success w-100 p-3">🧾 Nova porudžbina</a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('porudzbine') }}" class="btn btn-warning w-100 p-3">📄 Sve porudžbine</a>
+        </div>
+        {% if session['uloga'] == 'admin' %}
+        <div class="col-md-4">
+            <a href="{{ url_for('korisnici') }}" class="btn btn-info w-100 p-3">👥 Korisnici</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+</body>
+</html>

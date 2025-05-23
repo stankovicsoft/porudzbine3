@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nova porudžbina</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-4">
+    <h2>Nova porudžbina</h2>
+    <form method="post">
+        <div class="mb-3"><label>Učenik:</label><input type="text" name="ucenik" class="form-control" required></div>
+        <table class="table table-bordered">
+            <thead><tr><th>Proizvod</th><th>Cena</th><th>Dostupno</th><th>Količina</th></tr></thead>
+            <tbody>
+            {% for p in proizvodi %}
+            <tr>
+                <td>{{ p[1] }}</td><td>{{ p[2] }}</td><td>{{ p[3] }}</td>
+                <td><input type="number" name="kolicina_{{ p[0] }}" value="0" min="0" max="{{ p[3] }}"></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" class="btn btn-success">Završi porudžbinu</button>
+    </form>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">Početna</a>
+</body>
+</html>

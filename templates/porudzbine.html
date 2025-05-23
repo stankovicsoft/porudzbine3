@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Porudžbine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-4">
+    <h2>Porudžbine</h2>
+    <form method="get" class="row g-3 mb-3">
+        <div class="col-md-3">
+            <label>Od datuma:</label>
+            <input type="date" name="od" class="form-control" value="{{ request.args.get('od', '') }}">
+        </div>
+        <div class="col-md-3">
+            <label>Do datuma:</label>
+            <input type="date" name="do" class="form-control" value="{{ request.args.get('do', '') }}">
+        </div>
+        <div class="col-md-3">
+            <label>Učenik:</label>
+            <input type="text" name="ucenik" class="form-control" value="{{ request.args.get('ucenik', '') }}">
+        </div>
+        <div class="col-md-3 align-self-end">
+            <button type="submit" class="btn btn-primary">Filtriraj</button>
+            <a href="{{ url_for('porudzbine') }}" class="btn btn-secondary">Poništi</a>
+        </div>
+    </form>
+
+    <a href="{{ url_for('izvoz_porudzbina') }}" class="btn btn-outline-success btn-sm mb-3">Preuzmi sve porudžbine (CSV)</a>
+    <a href="{{ url_for('izvestaj_csv') }}" class="btn btn-outline-info btn-sm mb-3 ms-2">Najtraženiji proizvodi (CSV)</a>
+
+    <table class="table table-bordered">
+        <thead><tr><th>Datum</th><th>Učenik</th><th>Radnik</th><th>Akcija</th></tr></thead>
+        <tbody>
+        {% for p in porudzbine %}
+        <tr>
+            <td>{{ p[1] }}</td><td>{{ p[2] }}</td><td>{{ p[3] }}</td>
+            <td>
+                {% if session['uloga'] == 'admin' %}
+                <a href="{{ url_for('obrisi_porudzbinu', porudzbina_id=p[0]) }}" class="btn btn-danger btn-sm" onclick="return confirm('Obrisati porudžbinu?')">Obriši</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Početna</a>
+</body>
+</html>
