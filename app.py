@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
-from io import StringIO
+from io import StringIO, BytesIO
 import csv
 
 app = Flask(__name__)
@@ -49,6 +49,22 @@ def proizvodi():
     proizvodi = c.fetchall()
     conn.close()
     return render_template('proizvodi.html', proizvodi=proizvodi)
+
+@app.route('/dodaj_proizvod', methods=['GET', 'POST'])
+def dodaj_proizvod():
+    if session.get('uloga') != 'admin':
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        naziv = request.form['naziv']
+        cena = float(request.form['cena'])
+        kolicina = int(request.form['kolicina'])
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT INTO proizvodi (naziv, cena, kolicina) VALUES (?, ?, ?)", (naziv, cena, kolicina))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('proizvodi'))
+    return render_template('dodaj_proizvod.html')
 
 @app.route('/korisnici')
 def korisnici():
@@ -113,46 +129,6 @@ def porudzbine():
     conn.close()
     return render_template("porudzbine.html", porudzbine=porudzbine)
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5001)
-
-
-@app.route('/admin')
-def admin():
-    if session.get('uloga') != 'admin':
-        return redirect(url_for('index'))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM korisnici")
-    korisnici = c.fetchall()
-    c.execute("SELECT * FROM proizvodi")
-    proizvodi = c.fetchall()
-    c.execute("SELECT COUNT(*) FROM porudzbine")
-    ukupno_porudzbina = c.fetchone()[0]
-    c.execute("SELECT SUM(s.kolicina * s.cena_po_jedinici) FROM stavke_porudzbine s")
-    ukupna_vrednost = c.fetchone()[0] or 0
-    c.execute("SELECT p.naziv FROM proizvodi p JOIN stavke_porudzbine s ON s.proizvod_id = p.id GROUP BY p.id ORDER BY SUM(s.kolicina) DESC LIMIT 1")
-    top_proizvod = c.fetchone()
-    statistika = {
-        'ukupno_porudzbina': ukupno_porudzbina,
-        'ukupna_vrednost': round(ukupna_vrednost, 2),
-        'top_proizvod': top_proizvod[0] if top_proizvod else 'N/A'
-    }
-    conn.close()
-    return render_template("admin_dashboard.html", korisnici=korisnici, proizvodi=proizvodi, statistika=statistika)
-
-
-@app.route('/korisnici')
-def korisnici():
-    if session.get('uloga') != 'admin':
-        return redirect(url_for('index'))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM korisnici")
-    korisnici = c.fetchall()
-    conn.close()
-    return render_template('korisnici.html', korisnici=korisnici)
-
 @app.route('/dodaj_korisnika', methods=['GET', 'POST'])
 def dodaj_korisnika():
     if session.get('uloga') != 'admin':
@@ -195,65 +171,59 @@ def obrisi_porudzbinu(porudzbina_id):
 
 @app.route('/izvestaj_csv')
 def izvestaj_csv():
-    import csv
-    from io import StringIO
-    from flask import send_file
-
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT p.naziv, SUM(s.kolicina) FROM stavke_porudzbine s JOIN proizvodi p ON p.id = s.proizvod_id GROUP BY p.id ORDER BY SUM(s.kolicina) DESC")
+    c.execute("""
+        SELECT p.naziv, SUM(s.kolicina)
+        FROM stavke_porudzbine s
+        JOIN proizvodi p ON s.proizvod_id = p.id
+        GROUP BY s.proizvod_id
+        ORDER BY SUM(s.kolicina) DESC
+    """)
     podaci = c.fetchall()
     conn.close()
+
+    # Kreiramo CSV sadržaj kao tekst
     si = StringIO()
-    cw = csv.writer(si)
-    cw.writerow(['Proizvod', 'Ukupno naručeno'])
-    cw.writerows(podaci)
-    si.seek(0)
-    return send_file(si, mimetype='text/csv', as_attachment=True, download_name='izvestaj.csv')
+    writer = csv.writer(si)
+    writer.writerow(['Proizvod', 'Ukupno naručeno'])
+    writer.writerows(podaci)
+
+    # Pretvaramo tekst u bajtove
+    output = BytesIO()
+    output.write(si.getvalue().encode('utf-8'))
+    output.seek(0)
+
+    return send_file(output, mimetype='text/csv', as_attachment=True, download_name='izvestaj.csv')
 
 @app.route('/izvoz_porudzbina')
 def izvoz_porudzbina():
-    import csv
-    from io import StringIO
-    from flask import send_file
-
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT p.datum, p.ucenik, k.ime, pr.naziv, s.kolicina FROM porudzbine p JOIN korisnici k ON p.korisnik_id = k.id JOIN stavke_porudzbine s ON s.porudzbina_id = p.id JOIN proizvodi pr ON pr.id = s.proizvod_id ORDER BY p.datum DESC")
+    c.execute("""
+        SELECT p.datum, p.ucenik, k.ime, pr.naziv, s.kolicina
+        FROM porudzbine p
+        JOIN korisnici k ON p.korisnik_id = k.id
+        JOIN stavke_porudzbine s ON s.porudzbina_id = p.id
+        JOIN proizvodi pr ON pr.id = s.proizvod_id
+        ORDER BY p.datum DESC
+    """)
     podaci = c.fetchall()
     conn.close()
-    si = StringIO()
-    cw = csv.writer(si)
-    cw.writerow(['Datum', 'Učenik', 'Radnik', 'Proizvod', 'Količina'])
-    cw.writerows(podaci)
-    si.seek(0)
-    return send_file(si, mimetype='text/csv', as_attachment=True, download_name='porudzbine.csv')
 
-@app.route('/porudzbine')
-def porudzbine():
-    if 'korisnik_id' not in session:
-        return redirect(url_for('login'))
-    od = request.args.get('od', '')
-    do = request.args.get('do', '')
-    ucenik = request.args.get('ucenik', '')
-    query = "SELECT p.id, p.datum, p.ucenik, k.ime FROM porudzbine p JOIN korisnici k ON p.korisnik_id = k.id WHERE 1=1"
-    params = []
-    if od:
-        query += " AND p.datum >= ?"
-        params.append(od)
-    if do:
-        query += " AND p.datum <= ?"
-        params.append(do)
-    if ucenik:
-        query += " AND LOWER(p.ucenik) LIKE ?"
-        params.append(f"%{ucenik.lower()}%")
-    query += " ORDER BY p.datum DESC"
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(query, params)
-    porudzbine = c.fetchall()
-    conn.close()
-    return render_template("porudzbine.html", porudzbine=porudzbine)
+    # pišemo CSV kao tekst u StringIO
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(['Datum', 'Učenik', 'Radnik', 'Proizvod', 'Količina'])
+    writer.writerows(podaci)
+
+    # enkodujemo kao bajtove za BytesIO
+    output = BytesIO()
+    output.write(si.getvalue().encode('utf-8'))
+    output.seek(0)
+
+    return send_file(output, mimetype='text/csv', as_attachment=True, download_name='porudzbine.csv')
+
 
 @app.route('/admin')
 def admin():
@@ -278,3 +248,55 @@ def admin():
     }
     conn.close()
     return render_template("admin_dashboard.html", korisnici=korisnici, proizvodi=proizvodi, statistika=statistika)
+
+@app.route('/izmeni_proizvod/<int:proizvod_id>', methods=['GET', 'POST'])
+def izmeni_proizvod(proizvod_id):
+    if session.get('uloga') != 'admin':
+        return redirect(url_for('index'))
+    conn = get_db()
+    c = conn.cursor()
+    if request.method == 'POST':
+        naziv = request.form['naziv']
+        cena = float(request.form['cena'])
+        kolicina = int(request.form['kolicina'])
+        c.execute("UPDATE proizvodi SET naziv=?, cena=?, kolicina=? WHERE id=?", (naziv, cena, kolicina, proizvod_id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('proizvodi'))
+    c.execute("SELECT * FROM proizvodi WHERE id=?", (proizvod_id,))
+    proizvod = c.fetchone()
+    conn.close()
+    return render_template("izmeni_proizvod.html", proizvod=proizvod)
+
+@app.route('/obrisi_proizvod/<int:proizvod_id>')
+def obrisi_proizvod(proizvod_id):
+    if session.get('uloga') != 'admin':
+        return redirect(url_for('index'))
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM proizvodi WHERE id=?", (proizvod_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('proizvodi'))
+
+@app.route('/izmeni_korisnika/<int:id>', methods=['GET', 'POST'])
+def izmeni_korisnika(id):
+    if session.get('uloga') != 'admin':
+        return redirect(url_for('index'))
+    conn = get_db()
+    c = conn.cursor()
+    if request.method == 'POST':
+        ime = request.form['ime']
+        email = request.form['email']
+        uloga = request.form['uloga']
+        c.execute("UPDATE korisnici SET ime=?, email=?, uloga=? WHERE id=?", (ime, email, uloga, id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('korisnici'))
+    c.execute("SELECT * FROM korisnici WHERE id=?", (id,))
+    korisnik = c.fetchone()
+    conn.close()
+    return render_template("izmeni_korisnika.html", korisnik=korisnik)
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5001)
