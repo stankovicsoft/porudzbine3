@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
 import sqlite3
+from datetime import date
 from werkzeug.security import generate_password_hash, check_password_hash
 from io import StringIO, BytesIO
 import csv
@@ -99,9 +100,10 @@ def porudzbina():
         conn.commit()
         conn.close()
         return redirect(url_for('porudzbine'))
+    danas = date.today().isoformat()  # npr. '2025-05-31'
     proizvodi = c.execute("SELECT * FROM proizvodi").fetchall()
     conn.close()
-    return render_template("porudzbina.html", proizvodi=proizvodi)
+    return render_template("porudzbina.html", proizvodi=proizvodi, danas = danas)
 
 @app.route('/porudzbine')
 def porudzbine():
@@ -185,13 +187,13 @@ def izvestaj_csv():
 
     # Kreiramo CSV sadržaj kao tekst
     si = StringIO()
-    writer = csv.writer(si)
+    writer = csv.writer(si, delimiter=';')
     writer.writerow(['Proizvod', 'Ukupno naručeno'])
     writer.writerows(podaci)
 
     # Pretvaramo tekst u bajtove
     output = BytesIO()
-    output.write(si.getvalue().encode('utf-8'))
+    output.write(si.getvalue().encode('utf-8-sig'))
     output.seek(0)
 
     return send_file(output, mimetype='text/csv', as_attachment=True, download_name='izvestaj.csv')
@@ -213,13 +215,13 @@ def izvoz_porudzbina():
 
     # pišemo CSV kao tekst u StringIO
     si = StringIO()
-    writer = csv.writer(si)
+    writer = csv.writer(si, delimiter=';')
     writer.writerow(['Datum', 'Učenik', 'Radnik', 'Proizvod', 'Količina'])
     writer.writerows(podaci)
 
     # enkodujemo kao bajtove za BytesIO
     output = BytesIO()
-    output.write(si.getvalue().encode('utf-8'))
+    output.write(si.getvalue().encode('utf-8-sig'))
     output.seek(0)
 
     return send_file(output, mimetype='text/csv', as_attachment=True, download_name='porudzbine.csv')

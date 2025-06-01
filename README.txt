@@ -1,1 +1,1 @@
-Flask aplikacija za školski kiosk – početna struktura (baza + templates).
+Flask aplikacija za školski kiosk.
