@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
 import sqlite3
 from datetime import date
+from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from io import StringIO, BytesIO
 import csv
@@ -299,6 +300,25 @@ def izmeni_korisnika(id):
     korisnik = c.fetchone()
     conn.close()
     return render_template("izmeni_korisnika.html", korisnik=korisnik)
+
+@app.template_filter('formatiraj_broj')
+def formatiraj_broj(vrednost):
+    try:
+        s = f"{float(vrednost):,.2f}"  # dobiješ npr. 1,234,567.89
+        s = s.replace(",", "X").replace(".", ",").replace("X", ".")
+        return s
+    except:
+        return vrednost
+
+@app.template_filter('formatiraj_datum')
+def formatiraj_datum(datum):
+    if isinstance(datum, str):
+        # ako je string, pretvori u datetime objekat
+        try:
+            datum = datetime.fromisoformat(datum)
+        except ValueError:
+            return datum  # ako ne može da parsira, vrati original
+    return datum.strftime('%d.%m.%Y')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

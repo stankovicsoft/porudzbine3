@@ -16,7 +16,7 @@
             <tbody>
             {% for p in proizvodi %}
             <tr>
-                <td>{{ p[1] }}</td><td>{{ p[2] }}</td><td>{{ p[3] }}</td>
+                <td>{{ p[1] }}</td><td>{{ p[2] | formatiraj_broj }}</td><td>{{ p[3] }}</td>
                 <td><input type="number" name="kolicina_{{ p[0] }}" value="0" min="0" max="{{ p[3] }}"></td>
             </tr>
             {% endfor %}
